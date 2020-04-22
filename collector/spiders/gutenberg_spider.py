@@ -2,9 +2,9 @@ import scrapy
 from collector.items import Book
 
 
-class BookSpider(scrapy.Spider):
+class FictionSpider(scrapy.Spider):
     name = 'gutenberg'
-    allowed_domains = ['www.gutenberg.org', 'www.goodreads.org']
+    allowed_domains = ['www.gutenberg.org']
 
     start_url = 'http://www.gutenberg.org/wiki/Category:Fiction_Bookshelf'
     gutenberg_base = 'http://www.gutenberg.org'
@@ -12,7 +12,6 @@ class BookSpider(scrapy.Spider):
 
     # Log strings
     BOOK_CRAWLING = "Crawling book from url: "
-    RATING_CRAWLING = "Crawling rating from url: "
 
     def start_requests(self):
         yield scrapy.Request(self.start_url, self.handle_page)
@@ -33,14 +32,15 @@ class BookSpider(scrapy.Spider):
             url = book.xpath('.//@href').extract_first()
             title = book.xpath('.//text()').extract_first()
             d = {'genre': response.meta.get('genre'), 'title': title}
-            yield scrapy.Request(self.scheme_http + url, self.parse_book, meta=d)
+            yield scrapy.Request(self.scheme_http + url, self.handle_book, meta=d)
 
-    def parse_book(self, response):
+    def handle_book(self, response):
         self.logger.info(self.BOOK_CRAWLING + response.url + "...")
         url = response.xpath('//a[@type="text/plain"]/@href').extract_first()
-        yield scrapy.Request(self.gutenberg_base + url, self.save_book, meta=response.meta)
+        if url:
+            yield scrapy.Request(self.gutenberg_base + url, self.parse_book, meta=response.meta)
 
-    def save_book(self, response):
+    def parse_book(self, response):
         content = response.xpath('//text()').extract_first()
         title = response.meta.get('title')
         genre = response.meta.get('genre')
