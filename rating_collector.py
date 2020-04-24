@@ -7,19 +7,20 @@ import logging
 from pymongo import MongoClient
 
 
-DELAY = 0.5
+DELAY = 0.3
 DRIVER_PATH = '/Users/xing/Executable/chromedriver'
 GOODREADS_SEARCH = 'https://www.goodreads.com/search?q='
-logging.basicConfig(level=logging.INFO)
 PUNCT = '''!()-[]{};:'"\,<>./?@#$%^&*_~'''
+CREDENTIAL = 'credential.txt'
+logging.basicConfig(level=logging.INFO)
 
 
-def remove_punct(str):
+def remove_punct_n_lower(str):
     no_punct = ""
     for char in str:
         if char not in PUNCT:
             no_punct = no_punct + char
-    return no_punct
+    return no_punct.lower()
 
 
 def divide_chunks(l, n):
@@ -68,31 +69,40 @@ def crawling_worker(email, password, titles, db_handle):
         # Switch to the newly opened tab.
         # chrome.switch_to.window(chrome.window_handles[1])
         # Search book in the search bar.
-        t = remove_punct(title)
+        t = remove_punct_n_lower(title)
         chrome.get(GOODREADS_SEARCH + t.replace(' ', '+'))
         time.sleep(DELAY)
-
+        print('======== ******** ========')
+        print('Title: {}'.format(t))
+        rating = 1.00
         # Get the rating and rating_count (to-do).
-        table = chrome.find_element_by_xpath('//table[@class="tableList"]')
-        candidates = table.find_elements_by_xpath('//tbody/tr')
-        rating = -1
+        try:
+            table = chrome.find_element_by_xpath('//table[@class="tableList"]/tbody')
+            candidates = table.find_elements_by_xpath('./tr')
+        except NoSuchElementException:
+            print('Element not found!')
+            coll.update_one({'title': title}, {'$set': {'rating': rating}})
+            continue
+
         for book in candidates:
-            # The second td label contains info
-            book = book.find_elements_by_xpath('//td')[1]
+            # The second td label contains rating and rating_count info
+            book = book.find_elements_by_xpath('./td')[1]
             # Title of the candidate
-            str = book.find_element_by_xpath('//a[@class="bookTitle"]/span').text
-            str = remove_punct(str)
-            if t.lower() in str.lower():  # If title of the candidate contains the book title, it's the right one
-                rating_field = book.find_elements_by_xpath('//div')[0]  # First div lable contains info
+            str = book.find_element_by_xpath('./a[@class="bookTitle"]/span').text
+            str = remove_punct_n_lower(str)
+            print('Searched result: {}'.format(str))
+            if t in str:  # If title of the candidate contains the book title, it's the right one
+                rating_field = book.find_elements_by_xpath('./div')[0]  # First div lable contains rating info
                 # Raw text containig info "3.69 avg rating — 124 ratings"
-                raw_text = rating_field.find_element_by_xpath('//span/span[@class="minirating"]').text
+                raw_text = rating_field.find_element_by_xpath('./span/span[@class="minirating"]').text
                 try:
                     rating = float(raw_text[:4])
                 except:
                     print('Converting rating failed!')
                 break
-        print('{}: {}'.format(title, rating))
-        coll.update_one({'title': title}, {'$set': {'rating': rating}})
+        print('{}: {}'.format(t, rating))
+        print()
+        db_handle.update_one({'title': title}, {'$set': {'rating': rating}})
     chrome.quit()
 
 
@@ -103,7 +113,9 @@ if __name__ == '__main__':
     coll = db['book']
 
     # Credential used to crawl data.
-    cred = {'email': '***', 'pass': '***'}
+    with open(CREDENTIAL) as f:
+        vals = f.readline().split(' ')
+    cred = {'email': vals[0], 'pass': vals[1]}
 
     # Get book title list
     title_list = list()
