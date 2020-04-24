@@ -6,7 +6,7 @@ import csv
 import logging
 from pymongo import MongoClient
 
-DELAY = 0.3
+DELAY = 0.2
 DRIVER_PATH = '/Users/xing/Executable/chromedriver'
 GOODREADS_SEARCH = 'https://www.goodreads.com/search?q='
 PUNCT = '''!()-[]{};:'"\,<>./?@#$%^&*_~'''
@@ -14,12 +14,13 @@ CREDENTIAL = 'credential.txt'
 logging.basicConfig(level=logging.INFO)
 
 
-def remove_punct_n_lower(str):
+def text_preprocessing(str):
+    # Remove punctuation, lower case, and separate by one space
     no_punct = ""
     for char in str:
         if char not in PUNCT:
             no_punct = no_punct + char
-    return no_punct.lower()
+    return ' '.join(no_punct.split())
 
 
 def divide_chunks(l, n):
@@ -68,11 +69,11 @@ def crawling_worker(email, password, titles, db_handle):
         # Switch to the newly opened tab.
         # chrome.switch_to.window(chrome.window_handles[1])
         # Search book in the search bar.
-        t = remove_punct_n_lower(title)
+        t = text_preprocessing(title)
         chrome.get(GOODREADS_SEARCH + t.replace(' ', '+'))
         time.sleep(DELAY)
-        print('======== ******** ========')
-        print('Title: {}'.format(t))
+        logging.info('======== ******** ========')
+        logging.info('Title: {}'.format(t))
         rating = 1.00
         rating_count = 0
         # Get the rating and rating_count (to-do).
@@ -80,7 +81,7 @@ def crawling_worker(email, password, titles, db_handle):
             table = chrome.find_element_by_xpath('//table[@class="tableList"]/tbody')
             candidates = table.find_elements_by_xpath('./tr')
         except NoSuchElementException:
-            print('Element not found!')
+            logging.info('Element not found!')
             coll.update_one({'title': title}, {'$set': {'rating': rating, 'rating_count': rating_count}})
             continue
 
@@ -89,8 +90,8 @@ def crawling_worker(email, password, titles, db_handle):
             book = book.find_elements_by_xpath('./td')[1]
             # Title of the candidate
             str = book.find_element_by_xpath('./a[@class="bookTitle"]/span').text
-            str = remove_punct_n_lower(str)
-            print('Searched result: {}'.format(str))
+            str = text_preprocessing(str)
+            logging.info('Searched result: {}'.format(str))
             if t in str:  # If title of the candidate contains the book title, it's the right one
                 rating_field = book.find_elements_by_xpath('./div')[0]  # First div lable contains rating info
                 # Raw text containig info "3.69 avg rating — 124 ratings"
@@ -101,10 +102,9 @@ def crawling_worker(email, password, titles, db_handle):
                     j = raw_text.find(' ratings')
                     rating_count = int(raw_text[i+9:j])
                 except:
-                    print('Converting rating failed!')
+                    logging.info('Converting rating failed!')
                 break
-        print('{}: rating: {} count: {}'.format(t, rating, rating_count))
-        print()
+        logging.info('{}: rating: {} count: {}\n'.format(t, rating, rating_count))
         db_handle.update_one({'title': title}, {'$set': {'rating': rating, 'rating_count': rating_count}})
     chrome.quit()
 
