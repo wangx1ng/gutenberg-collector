@@ -6,7 +6,6 @@ import csv
 import logging
 from pymongo import MongoClient
 
-
 DELAY = 0.3
 DRIVER_PATH = '/Users/xing/Executable/chromedriver'
 GOODREADS_SEARCH = 'https://www.goodreads.com/search?q='
@@ -75,13 +74,14 @@ def crawling_worker(email, password, titles, db_handle):
         print('======== ******** ========')
         print('Title: {}'.format(t))
         rating = 1.00
+        rating_count = 0
         # Get the rating and rating_count (to-do).
         try:
             table = chrome.find_element_by_xpath('//table[@class="tableList"]/tbody')
             candidates = table.find_elements_by_xpath('./tr')
         except NoSuchElementException:
             print('Element not found!')
-            coll.update_one({'title': title}, {'$set': {'rating': rating}})
+            coll.update_one({'title': title}, {'$set': {'rating': rating, 'rating_count': rating_count}})
             continue
 
         for book in candidates:
@@ -97,12 +97,15 @@ def crawling_worker(email, password, titles, db_handle):
                 raw_text = rating_field.find_element_by_xpath('./span/span[@class="minirating"]').text
                 try:
                     rating = float(raw_text[:4])
+                    i = raw_text.find('rating ')
+                    j = raw_text.find(' ratings')
+                    rating_count = int(raw_text[i+9:j])
                 except:
                     print('Converting rating failed!')
                 break
-        print('{}: {}'.format(t, rating))
+        print('{}: rating: {} count: {}'.format(t, rating, rating_count))
         print()
-        db_handle.update_one({'title': title}, {'$set': {'rating': rating}})
+        db_handle.update_one({'title': title}, {'$set': {'rating': rating, 'rating_count': rating_count}})
     chrome.quit()
 
 
@@ -110,7 +113,7 @@ if __name__ == '__main__':
     # Get mongodb connection
     client = MongoClient('localhost', 27017)
     db = client['books']
-    coll = db['book']
+    coll = db['books']
 
     # Credential used to crawl data.
     with open(CREDENTIAL) as f:
@@ -143,7 +146,3 @@ if __name__ == '__main__':
     #     proc.join()
 
     print('Finished crawling!')
-
-
-
-

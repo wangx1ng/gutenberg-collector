@@ -19,18 +19,18 @@ class FictionSpider(scrapy.Spider):
     def handle_page(self, response):
         categories = response.xpath('//div[@class="mw-category-group"]/ul/li/a')
         for cate in categories:
-            genre = cate.xpath('.//@title').extract_first()
+            genre = cate.xpath('./@title').extract_first()
             if genre.endswith(' (Bookshelf)'):
                 genre = genre[:-12]
-            suffix = cate.xpath('.//@href').extract_first()
+            suffix = cate.xpath('./@href').extract_first()
             d = {'genre': genre}
             yield scrapy.Request(self.gutenberg_base + suffix, self.handle_items, meta=d)
 
     def handle_items(self, response):
         books = response.xpath('//a[@class="extiw"]')
         for book in books:
-            url = book.xpath('.//@href').extract_first()
-            title = book.xpath('.//text()').extract_first()
+            url = book.xpath('./@href').extract_first()
+            title = book.xpath('./text()').extract_first()
             d = {'genre': response.meta.get('genre'), 'title': title}
             yield scrapy.Request(self.scheme_http + url, self.handle_book, meta=d)
 
@@ -46,7 +46,8 @@ class FictionSpider(scrapy.Spider):
         genre = response.meta.get('genre')
 
         book = Book()
-        book['title'] = title
+        # Remove '\r' and '\n' from title.
+        book['title'] = title.replace('\n', ' ').replace('\r', ' ')
         book['genre'] = genre
         book['content'] = content
         yield book
