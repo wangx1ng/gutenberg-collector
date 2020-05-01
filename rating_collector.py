@@ -20,7 +20,7 @@ def text_preprocessing(str):
     for char in str:
         if char not in PUNCT:
             no_punct = no_punct + char
-    return ' '.join(no_punct.split())
+    return ' '.join(no_punct.split()).lower()
 
 
 def divide_chunks(l, n):
@@ -74,8 +74,8 @@ def crawling_worker(email, password, titles, db_handle):
         time.sleep(DELAY)
         logging.info('======== ******** ========')
         logging.info('Title: {}'.format(t))
-        rating = 1.00
-        rating_count = 0
+        rating = float(1.00)
+        rating_count = 1
         # Get the rating and rating_count (to-do).
         try:
             table = chrome.find_element_by_xpath('//table[@class="tableList"]/tbody')
@@ -113,7 +113,7 @@ if __name__ == '__main__':
     # Get mongodb connection
     client = MongoClient('localhost', 27017)
     db = client['books']
-    coll = db['books']
+    coll = db['books2']
 
     # Credential used to crawl data.
     with open(CREDENTIAL) as f:

@@ -33,6 +33,6 @@ class MongoPipeline(object):
     def process_item(self, item, spider):
         # Update if book already exists
         data = {'$set': {'genre': item['genre'], 'content': item['content']}}
-        self.db['books'].update({'title': item['title']}, data, upsert=True)
+        self.db['books2'].update({'title': item['title']}, data, upsert=True)
         self.logger.info("Saved a book to database!")
         return item
